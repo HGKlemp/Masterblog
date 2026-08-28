@@ -30,4 +30,5 @@ Masterblog/
 │   └── templates/
 │
 ├── main.py
+├── requirements.txt
 └── README.md
