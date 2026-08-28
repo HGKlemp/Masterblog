@@ -1,4 +1,3 @@
-
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_swagger_ui import get_swaggerui_blueprint
@@ -172,6 +171,14 @@ def update_post(post_id):
     if not isinstance(data, dict):
         return jsonify({
             "error": "Invalid JSON data."
+        }), 400
+
+    if "title" not in data and "content" not in data:
+        return jsonify({
+            "error": (
+                "At least one field ('title' or 'content') "
+                "is required."
+            )
         }), 400
 
     if "title" in data:
