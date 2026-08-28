@@ -1,3 +1,4 @@
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_swagger_ui import get_swaggerui_blueprint
@@ -47,70 +48,81 @@ def find_post(post_id):
     return None
 
 
-@app.route("/api/posts", methods=["GET", "POST"])
-def handle_posts():
-    """Return all posts or create a new post."""
+@app.route("/api/posts", methods=["GET"])
+def get_posts():
+    """Return all posts, optionally sorted by title or content."""
 
-    if request.method == "GET":
-        sort_field = request.args.get("sort")
-        direction = request.args.get("direction")
+    sort_field = request.args.get("sort")
+    direction = request.args.get("direction")
 
-        if sort_field is None and direction is None:
-            return jsonify(POSTS), 200
+    if sort_field is None and direction is None:
+        return jsonify(POSTS), 200
 
-        if sort_field not in ["title", "content"]:
-            return jsonify({
-                "error": "Invalid sort field. Use 'title' or 'content'."
-            }), 400
+    if sort_field not in ["title", "content"]:
+        return jsonify({
+            "error": "Invalid sort field. Use 'title' or 'content'."
+        }), 400
 
-        if direction not in ["asc", "desc"]:
-            return jsonify({
-                "error": "Invalid direction. Use 'asc' or 'desc'."
-            }), 400
+    if direction not in ["asc", "desc"]:
+        return jsonify({
+            "error": "Invalid direction. Use 'asc' or 'desc'."
+        }), 400
 
-        reverse_sort = direction == "desc"
+    reverse_sort = direction == "desc"
 
-        sorted_posts = sorted(
-            POSTS,
-            key=lambda post: post[sort_field].lower(),
-            reverse=reverse_sort
-        )
+    sorted_posts = sorted(
+        POSTS,
+        key=lambda post: post[sort_field].lower(),
+        reverse=reverse_sort
+    )
 
-        return jsonify(sorted_posts), 200
+    return jsonify(sorted_posts), 200
 
-    if request.method == "POST":
-        data = request.get_json(silent=True)
 
-        missing_fields = []
+@app.route("/api/posts", methods=["POST"])
+def create_post():
+    """Create a new blog post."""
 
-        if not data or not data.get("title", "").strip():
-            missing_fields.append("title")
+    data = request.get_json(silent=True)
 
-        if not data or not data.get("content", "").strip():
-            missing_fields.append("content")
+    if not isinstance(data, dict):
+        return jsonify({
+            "error": "Invalid JSON data."
+        }), 400
 
-        if missing_fields:
-            return jsonify({
-                "error": (
-                    f"Missing required field(s): "
-                    f"{', '.join(missing_fields)}"
-                )
-            }), 400
+    missing_fields = []
 
-        if POSTS:
-            new_id = max(post["id"] for post in POSTS) + 1
-        else:
-            new_id = 1
+    title = data.get("title")
+    content = data.get("content")
 
-        new_post = {
-            "id": new_id,
-            "title": data["title"].strip(),
-            "content": data["content"].strip()
-        }
+    if not isinstance(title, str) or not title.strip():
+        missing_fields.append("title")
 
-        POSTS.append(new_post)
+    if not isinstance(content, str) or not content.strip():
+        missing_fields.append("content")
 
-        return jsonify(new_post), 201
+    if missing_fields:
+        return jsonify({
+            "error": (
+                f"Missing required field(s): "
+                f"{', '.join(missing_fields)}"
+            )
+        }), 400
+
+    if POSTS:
+        new_id = max(post["id"] for post in POSTS) + 1
+    else:
+        new_id = 1
+
+    new_post = {
+        "id": new_id,
+        "title": title.strip(),
+        "content": content.strip()
+    }
+
+    POSTS.append(new_post)
+
+    return jsonify(new_post), 201
 
 
 @app.route("/api/posts/search", methods=["GET"])
@@ -144,9 +156,9 @@ def search_posts():
     return jsonify(filtered_posts), 200
 
 
-@app.route("/api/posts/<int:post_id>", methods=["PUT", "DELETE"])
-def handle_post(post_id):
-    """Update or delete a post with the given ID."""
+@app.route("/api/posts/<int:post_id>", methods=["PUT"])
+def update_post(post_id):
+    """Update an existing blog post."""
 
     post = find_post(post_id)
 
@@ -155,29 +167,55 @@ def handle_post(post_id):
             "error": f"Post with id {post_id} was not found."
         }), 404
 
-    if request.method == "DELETE":
-        POSTS.remove(post)
+    data = request.get_json(silent=True)
 
+    if not isinstance(data, dict):
         return jsonify({
-            "message": (
-                f"Post with id {post_id} "
-                f"has been deleted successfully."
-            )
-        }), 200
+            "error": "Invalid JSON data."
+        }), 400
 
-    if request.method == "PUT":
-        data = request.get_json(silent=True)
+    if "title" in data:
+        title = data["title"]
 
-        if not data:
-            data = {}
+        if not isinstance(title, str) or not title.strip():
+            return jsonify({
+                "error": "Title must be a non-empty string."
+            }), 400
 
-        if "title" in data:
-            post["title"] = data["title"]
+        post["title"] = title.strip()
 
-        if "content" in data:
-            post["content"] = data["content"]
+    if "content" in data:
+        content = data["content"]
 
-        return jsonify(post), 200
+        if not isinstance(content, str) or not content.strip():
+            return jsonify({
+                "error": "Content must be a non-empty string."
+            }), 400
+
+        post["content"] = content.strip()
+
+    return jsonify(post), 200
+
+
+@app.route("/api/posts/<int:post_id>", methods=["DELETE"])
+def delete_post(post_id):
+    """Delete an existing blog post."""
+
+    post = find_post(post_id)
+
+    if post is None:
+        return jsonify({
+            "error": f"Post with id {post_id} was not found."
+        }), 404
+
+    POSTS.remove(post)
+
+    return jsonify({
+        "message": (
+            f"Post with id {post_id} "
+            f"has been deleted successfully."
+        )
+    }), 200
 
 
 if __name__ == "__main__":
